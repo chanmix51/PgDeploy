@@ -1,180 +1,179 @@
-glue=# BEGIN;
-BEGIN
-glue=# -- Let's create a function "Foo"
-glue=# CREATE FUNCTION Foo(_X numeric) RETURNS NUMERIC AS $BODY$
-glue$# DECLARE
-glue$# BEGIN
-glue$# RETURN _X * 2;
-glue$# END;
-glue$# $BODY$ LANGUAGE plpgsql IMMUTABLE;
-CREATE FUNCTION
-glue=# 
-glue=# -- Let's create another function "Bar"
-glue=# CREATE FUNCTION Bar(_Y numeric) RETURNS NUMERIC AS $BODY$
-glue$# DECLARE
-glue$# BEGIN
-glue$# RETURN _Y / 2;
-glue$# END;
-glue$# $BODY$ LANGUAGE plpgsql IMMUTABLE;
-CREATE FUNCTION
-glue=# 
-glue=# -- Let's see at the changes our deploy would make
-glue=# 
-glue=# SELECT Deploy($DEPLOY$
-glue$# 
-glue$# -- Let's drop the Foo function...
-glue$# DROP FUNCTION Foo(numeric);
-glue$# 
-glue$# -- ...and change the Bar function...
-glue$# CREATE OR REPLACE FUNCTION Bar(_Y numeric) RETURNS NUMERIC AS $BODY$
-glue$# DECLARE
-glue$# BEGIN
-glue$# RETURN _Y / 3;
-glue$# END;
-glue$# $BODY$ LANGUAGE plpgsql IMMUTABLE;
-glue$# 
-glue$# -- ...and add a Blerk function...
-glue$# CREATE OR REPLACE FUNCTION Blerk(_Z numeric) RETURNS TEXT AS $BODY$
-glue$# DECLARE
-glue$# BEGIN
-glue$# RETURN 'Hej';
-glue$# END;
-glue$# $BODY$ LANGUAGE plpgsql IMMUTABLE;
-glue$# 
-glue$# 
-glue$# $DEPLOY$,NULL);
+postgres=# -- PgDeploy demo
+postgres=# --
+postgres=# -- SELECT deploy($DEP$...function definition...$DEP$, MD5 of diff);
+postgres=# --
+postgres=#
+postgres=# SELECT deploy($DEP$
+postgres$# CREATE OR REPLACE FUNCTION calc_value_added_tax(amount numeric) RETURNS NUMERIC AS $$
+postgres$# DECLARE
+postgres$# _vat numeric := 0.25;
+postgres$# BEGIN
+postgres$# RETURN amount * (1 + _vat);
+postgres$# END;
+postgres$# $$ LANGUAGE plpgsql IMMUTABLE;
+postgres$# $DEP$, NULL);
                       deploy                      
 --------------------------------------------------
- +-------------------+
- | Removed functions |
- +-------------------+
- 
- Schema................- public
- Name..................- foo
- Argument data types...- _x numeric
- Result data type......- numeric
- Language..............- plpgsql
- Type..................- normal
- Volatility............- IMMUTABLE
- Owner.................- postgres
- Source code (chars)...- 35
- 
- 
- +---------------+
- | New functions |
- +---------------+
- 
- Schema................+ public
- Name..................+ blerk
- Argument data types...+ _z numeric
- Result data type......+ text
- Language..............+ plpgsql
- Type..................+ normal
- Volatility............+ IMMUTABLE
- Owner.................+ postgres
- Source code (chars)...+ 34
- 
- 
- +-------------------------------+
- | Updated or replaced functions |
- +-------------------------------+
- 
- Schema................: public
- Name..................: bar
- Argument data types...: _y numeric
- Result data type......: numeric
- Language..............: plpgsql
- Type..................: normal
- Volatility............: IMMUTABLE
- Owner.................: postgres
- 4 c RETURN _Y / 2;
- 4 c RETURN _Y / 3;
- 
- 
- 
- MD5 of changes: 635e11295435a8eb47519ccd38a5a6d0
+ +-------------------+                           +
+ | Removed functions |                           +
+ +-------------------+                           +
+                                                 +
+                                                 +
+                                                 +
+ +---------------+                               +
+ | New functions |                               +
+ +---------------+                               +
+                                                 +
+ Schema................+ public                  +
+ Name..................+ calc_value_added_tax    +
+ Argument data types...+ amount numeric          +
+ Result data type......+ numeric                 +
+ Language..............+ plpgsql                 +
+ Type..................+ normal                  +
+ Volatility............+ IMMUTABLE               +
+ Owner.................+ postgres                    +
+ Source code (chars)...+ 70                      +
+                                                 +
+                                                 +
+ +-------------------------------+               +
+ | Updated or replaced functions |               +
+ +-------------------------------+               +
+                                                 +
+ MD5 of changes: 74e9f61aa5a0ce1c333748ff589a3029
 (1 row)
 
-glue=# 
-glue=# -- Changes looks good. Let's deploy for real!
-glue=# 
-glue=# SELECT Deploy($DEPLOY$
-glue$# 
-glue$# -- Let's drop the Foo function...
-glue$# DROP FUNCTION Foo(numeric);
-glue$# 
-glue$# -- ...and change the Bar function...
-glue$# CREATE OR REPLACE FUNCTION Bar(_Y numeric) RETURNS NUMERIC AS $BODY$
-glue$# DECLARE
-glue$# BEGIN
-glue$# RETURN _Y / 3;
-glue$# END;
-glue$# $BODY$ LANGUAGE plpgsql IMMUTABLE;
-glue$# 
-glue$# -- ...and add a Blerk function...
-glue$# CREATE OR REPLACE FUNCTION Blerk(_Z numeric) RETURNS TEXT AS $BODY$
-glue$# DECLARE
-glue$# BEGIN
-glue$# RETURN 'Hej';
-glue$# END;
-glue$# $BODY$ LANGUAGE plpgsql IMMUTABLE;
-glue$# 
-glue$# 
-glue$# $DEPLOY$,'635e11295435a8eb47519ccd38a5a6d0');
+postgres=# -- The above tells us this is a new function, like expected.
+postgres=# -- Good. Lets proceed deploying by passing the MD5 as the second
+postgres=# -- argument instead of NULL.
+postgres=#
+postgres=# SELECT deploy($DEP$
+postgres$# CREATE OR REPLACE FUNCTION calc_value_added_tax(amount numeric) RETURNS NUMERIC AS $$
+postgres$# DECLARE
+postgres$# _vat numeric := 0.25;
+postgres$# BEGIN
+postgres$# RETURN amount * (1 + _vat);
+postgres$# END;
+postgres$# $$ LANGUAGE plpgsql IMMUTABLE;
+postgres$# $DEP$, '74e9f61aa5a0ce1c333748ff589a3029');
                       deploy                      
 --------------------------------------------------
- +-------------------+
- | Removed functions |
- +-------------------+
- 
- Schema................- public
- Name..................- foo
- Argument data types...- _x numeric
- Result data type......- numeric
- Language..............- plpgsql
- Type..................- normal
- Volatility............- IMMUTABLE
- Owner.................- postgres
- Source code (chars)...- 35
- 
- 
- +---------------+
- | New functions |
- +---------------+
- 
- Schema................+ public
- Name..................+ blerk
- Argument data types...+ _z numeric
- Result data type......+ text
- Language..............+ plpgsql
- Type..................+ normal
- Volatility............+ IMMUTABLE
- Owner.................+ postgres
- Source code (chars)...+ 34
- 
- 
- +-------------------------------+
- | Updated or replaced functions |
- +-------------------------------+
- 
- Schema................: public
- Name..................: bar
- Argument data types...: _y numeric
- Result data type......: numeric
- Language..............: plpgsql
- Type..................: normal
- Volatility............: IMMUTABLE
- Owner.................: postgres
- 4 c RETURN _Y / 2;
- 4 c RETURN _Y / 3;
- 
- 
- 
- MD5 of changes: 635e11295435a8eb47519ccd38a5a6d0
+ +-------------------+                           +
+ | Removed functions |                           +
+ +-------------------+                           +
+                                                 +
+                                                 +
+                                                 +
+ +---------------+                               +
+ | New functions |                               +
+ +---------------+                               +
+                                                 +
+ Schema................+ public                  +
+ Name..................+ calc_value_added_tax    +
+ Argument data types...+ amount numeric          +
+ Result data type......+ numeric                 +
+ Language..............+ plpgsql                 +
+ Type..................+ normal                  +
+ Volatility............+ IMMUTABLE               +
+ Owner.................+ postgres                    +
+ Source code (chars)...+ 70                      +
+                                                 +
+                                                 +
+ +-------------------------------+               +
+ | Updated or replaced functions |               +
+ +-------------------------------+               +
+                                                 +
+ MD5 of changes: 74e9f61aa5a0ce1c333748ff589a3029
 (1 row)
 
-glue=# 
-glue=# -- Done!
-glue=# COMMIT;
-COMMIT
-glue=# 
+postgres=# -- The function has now been deployed. We get the same diff back.
+postgres=# -- If the diff would have generated a different MD5, we would have
+postgres=# -- got an error, which could have happend if something changed between
+postgres=# -- the moment we did the preview and the moment when deploying for real.
+postgres=#
+postgres=# -- Some other developer makes a local change to the function, he doesn't
+postgres=# -- commit it to the VCS, and he has no clue about this deploy function.
+postgres=# -- The change is correct and everything, but from this point, the version
+postgres=# -- in the VCS won't have this change. Normally very dangerous scenario!
+postgres=#
+postgres=#
+postgres=# CREATE OR REPLACE FUNCTION calc_value_added_tax(amount numeric) RETURNS NUMERIC AS $$
+postgres$# DECLARE
+postgres$# _vat numeric := 0.25;
+postgres$# BEGIN
+postgres$# IF amount < 100 THEN
+postgres$#     RETURN amount;
+postgres$# ELSE
+postgres$#     RETURN amount * (1 + _vat);
+postgres$# END IF;
+postgres$# END;
+postgres$# $$ LANGUAGE plpgsql IMMUTABLE;
+CREATE FUNCTION
+postgres=#
+postgres=# -- A few months later, you are assigned the task to change the VAT from 25% to 12.5%.
+postgres=# -- You edit the function in the VCS, and change the single line of code,
+postgres=# -- and use the deploy function to make the deployment.
+postgres=# --
+postgres=# -- You expect to the diff to be a single line of code, but it's not!
+postgres=# -- You realize someone must have made a local change without committing to the VCS!
+postgres=# -- The deployment is aborted and you start to investigate how this could have happend.
+postgres=# --
+postgres=# -- PgDeploy saved the day.
+postgres=#
+postgres=#
+postgres=# SELECT deploy($DEP$
+postgres$# CREATE OR REPLACE FUNCTION calc_value_added_tax(amount numeric) RETURNS NUMERIC AS $$
+postgres$# DECLARE
+postgres$# _vat numeric := 0.125;
+postgres$# BEGIN
+postgres$# RETURN amount * (1 + _vat);
+postgres$# END;
+postgres$# $$ LANGUAGE plpgsql IMMUTABLE;
+postgres$# $DEP$, NULL);
+                      deploy                      
+--------------------------------------------------
+ +-------------------+                           +
+ | Removed functions |                           +
+ +-------------------+                           +
+                                                 +
+                                                 +
+                                                 +
+ +---------------+                               +
+ | New functions |                               +
+ +---------------+                               +
+                                                 +
+                                                 +
+                                                 +
+ +-------------------------------+               +
+ | Updated or replaced functions |               +
+ +-------------------------------+               +
+                                                 +
+ Schema................: public                  +
+ Name..................: calc_value_added_tax    +
+ Argument data types...: amount numeric          +
+ Result data type......: numeric                 +
+ Language..............: plpgsql                 +
+ Type..................: normal                  +
+ Volatility............: IMMUTABLE               +
+ Owner.................: postgres                    +
+ 3 c _vat numeric := 0.25;                       +
+ 3 c _vat numeric := 0.125;                      +
+                                                 +
+ 5 c IF amount < 100 THEN                        +
+ 5 c RETURN amount * (1 + _vat);                 +
+                                                 +
+ 6 -     RETURN amount;                          +
+ 6 -                                             +
+                                                 +
+ 7 - ELSE                                        +
+ 7 -                                             +
+                                                 +
+ 8 -     RETURN amount * (1 + _vat);             +
+ 8 -                                             +
+                                                 +
+ 9 - END IF;                                     +
+ 9 -                                             +
+                                                 +
+                                                 +
+                                                 +
+ MD5 of changes: 162d4dcc113345c71f6c9bc4448534aa
+(1 row)

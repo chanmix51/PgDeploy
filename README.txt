@@ -1,58 +1,138 @@
+PgDeploy - PostgreSQL function deployment system
+
+DESCRIPTION
+
+Watch the diff of the function's source code you are
+about to deployed, compared to the source code in
+PostgreSQL, before actually deploying.
+
+
+
+RATIONALE
+
+There is no best practise standard way of deploying functions in PostgreSQL,
+everybody seems to be doing it in a lot of different ways, so why not one.
+
+Using a VCS like git to keep track of changes to your stored procedures
+is easy, and most people are probably doing it and thinks it works fine.
+
+In the database, there is only one version of the function though,
+and this version should of course be 100% identical with the one in your VCS.
+
+To prevent errors, easily caused by human errors, strict routines and
+procedures must be managed, to make sure noone changed the functions
+directly in the database, or commits to the VCS but forgets to deploy,
+or deploys before commiting to the VCS, or any other human error.
+
+There are probably tools to link the VCS directly to the database,
+so function changes are deployed automatically when tagged
+or something like that. Personally, I would not trust such a system,
+it would feel scary doing deployments automatically, but that's
+probably just me being paranoid and falsely believing not everything
+can be automated.
+
+By always using this function when deploying stored procedures,
+you will always see the diff of the function before deploying,
+and get a chance to spot any unexpected rows in the diff.
+
+
+
+INTRODUCTION
+
+PgDeploy adds an additional security layer when deploying functions in
+PostgreSQL, letting you preview changes before actually deploying.
+
+If the version of the function in the production database would be different
+than the one in your VCS, this gives you a second change of detecting it.
+
+This will save you in case someone has modified a function directly in
+the database, without commiting to the VCS.
+
+
+
+
 SYNOPSIS
 
--- 1. Inspect what changes your deployment would cause to the functions:
---    Wrap the SQL your deployment consists of within dollar-quotes and pass it as the first argument to Deploy. The second argument must be NULL.
---    The deployment most typically consists of a single CREATE OR REPLACE FUNCTION statement, replacing the existing source code of an existing function,
---    but it could of course include statements creating new functions, dropping functions, changing ownership, etc.
---    In this step a rollback will be done before the function returns, so the SQL will have no effect, it will only execute it in order to present you with a diff.
-SELECT Deploy($DEPLOY$
-CREATE OR REPLACE FUNCTION Foo() RETURNS BOOLEAN AS $BODY$
-DECLARE
-BEGIN
-RETURN TRUE;
-END;
-$BODY$ LANGUAGE plpgsql VOLATILE;
-$DEPLOY$, NULL);
+git clone git://github.com/joelonsql/PgDeploy.git
+cd PgDeploy
+psql -f install.sql
+psql
 
--- Example output from Deploy-function:
-                      deploy                      
---------------------------------------------------
- +-------------------+
- | Removed functions |
- +-------------------+
- 
- 
- 
- +---------------+
- | New functions |
- +---------------+
- 
- Schema................+ public
- Name..................+ foo
- Argument data types...+ 
- Result data type......+ boolean
- Language..............+ plpgsql
- Type..................+ normal
- Volatility............+ VOLATILE
- Owner.................+ joel
- Source code (chars)...+ 33
- 
- 
- +-------------------------------+
- | Updated or replaced functions |
- +-------------------------------+
- 
- MD5 of changes: df62b14663c69887574cc320a2e20d78
+postgres=# \df deploy
+                                     List of functions
+ Schema |  Name  | Result data type |             Argument data types             |  Type  
+--------+--------+------------------+---------------------------------------------+--------
+ public | deploy | text             | OUT changes text, _sql text, _md5 character | normal
 (1 row)
 
+Step 1: Preview
 
--- 2. If the changes were expected and you feel it is safe to commit for real, copy/paste the MD5 sum and pass it as second argument:
-SELECT Deploy($DEPLOY$
-CREATE OR REPLACE FUNCTION Foo() RETURN BOOLEAN AS $BODY$
-DECLARE
-BEGIN
-RETURN TRUE;
-END;
-$BODY$ LANGUAGE plpgsql VOLATILE;
-$DEPLOY$, 'df62b14663c69887574cc320a2e20d78');
+postgres=# SELECT deploy($DEP$
+postgres$# CREATE OR REPLACE FUNCTION calc_value_added_tax(amount numeric) RETURNS NUMERIC AS $$
+postgres$# DECLARE
+postgres$# _vat numeric := 0.125;
+postgres$# BEGIN
+postgres$# RETURN amount * (1 + _vat);
+postgres$# END;
+postgres$# $$ LANGUAGE plpgsql IMMUTABLE;
+postgres$# $DEP$, NULL);
+                      deploy                      
+--------------------------------------------------
+ +-------------------+                           +
+ | Removed functions |                           +
+ +-------------------+                           +
+                                                 +
+                                                 +
+                                                 +
+ +---------------+                               +
+ | New functions |                               +
+ +---------------+                               +
+                                                 +
+                                                 +
+                                                 +
+ +-------------------------------+               +
+ | Updated or replaced functions |               +
+ +-------------------------------+               +
+                                                 +
+ Schema................: public                  +
+ Name..................: calc_value_added_tax    +
+ Argument data types...: amount numeric          +
+ Result data type......: numeric                 +
+ Language..............: plpgsql                 +
+ Type..................: normal                  +
+ Volatility............: IMMUTABLE               +
+ Owner.................: postgres                    +
+ 3 c _vat numeric := 0.25;                       +
+ 3 c _vat numeric := 0.125;                      +
+                                                 +
+ 5 c IF amount < 100 THEN                        +
+ 5 c RETURN amount * (1 + _vat);                 +
+                                                 +
+ 6 -     RETURN amount;                          +
+ 6 -                                             +
+                                                 +
+ 7 - ELSE                                        +
+ 7 -                                             +
+                                                 +
+ 8 -     RETURN amount * (1 + _vat);             +
+ 8 -                                             +
+                                                 +
+ 9 - END IF;                                     +
+ 9 -                                             +
+                                                 +
+                                                 +
+                                                 +
+ MD5 of changes: 162d4dcc113345c71f6c9bc4448534aa
+(1 row)
 
+Step 2: Deploy
+
+postgres=# SELECT deploy($DEP$
+postgres$# CREATE OR REPLACE FUNCTION calc_value_added_tax(amount numeric) RETURNS NUMERIC AS $$
+postgres$# DECLARE
+postgres$# _vat numeric := 0.125;
+postgres$# BEGIN
+postgres$# RETURN amount * (1 + _vat);
+postgres$# END;
+postgres$# $$ LANGUAGE plpgsql IMMUTABLE;
+postgres$# $DEP$, '162d4dcc113345c71f6c9bc4448534aa');
